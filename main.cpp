@@ -39,15 +39,15 @@ int main(int argc, char *argv[])
 
   CodeGenerator codegen;
 
-  string asmFilename = "dist/output.asm";
+  string asm_file_name = "dist/output.asm";
 
-  std::cout << asmFilename << "\n\n";
+  std::cout << asm_file_name << "\n\n";
 
-  codegen.generate(parsed_tree, asmFilename);
-  std::cout << "Assembly code generated: " << asmFilename << std::endl;
+  codegen.generate(parsed_tree, asm_file_name);
+  std::cout << "Assembly code generated: " << asm_file_name << std::endl;
 
-  string exeFilename = "dist/program";
-  if (assembleAndLink(asmFilename, exeFilename))
+  string exe_file_name = "dist/program";
+  if (assembleAndLink(asm_file_name, exe_file_name))
   {
     std::cout << "\n=== COMPILATION SUCCESS ===" << std::endl;
   }
