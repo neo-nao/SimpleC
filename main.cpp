@@ -1,15 +1,17 @@
-#include "tokenizer.hpp"
-#include <fstream>
-#include <unistd.h>
+#include "assembler.hpp"
 
-using std::ifstream;
-using std::string;
+int error_quit(string msg)
+{
+  std::cerr << msg << std::endl;
+  return EXIT_FAILURE;
+}
 
-int error_quit(string msg);
-
-int main(int argc, char *argv[]) {
-  if (argc != 2)
+int main(int argc, char *argv[])
+{
+  if (argc < 2)
     return error_quit("Input file to be compiled is missing...");
+
+  string content;
 
   string line{};
   int line_number{0};
@@ -18,29 +20,45 @@ int main(int argc, char *argv[]) {
 
     if (input.fail() || !input.is_open())
       return error_quit("Unable to open the file");
-    else {
-      std::vector<std::vector<Token>> tokens{};
-      while (getline(input, line)) {
-        if (line.empty())
-          continue;
-
-        tokens.push_back(tokenize(line, line_number));
-        line_number++;
-      }
-
-      for (std::vector<Token> el_v : tokens) {
-        for (Token token : el_v) {
-          std::cout << token.value << "\n";
-        }
-        std::cout << "\n===================\n\n";
+    else
+    {
+      while (getline(input, line))
+      {
+        content.append(line);
       }
     }
   }
 
-  return EXIT_SUCCESS;
-}
+  Lexer lexer(content);
 
-int error_quit(string msg) {
-  std::cerr << msg << std::endl;
-  return EXIT_FAILURE;
+  std::vector<Token> tokens = lexer.tokenize();
+
+  Parser parser(tokens);
+
+  ASTNode *parsed_tree = parser.parse();
+
+  CodeGenerator codegen;
+
+  string asmFilename = "dist/output.asm";
+
+  std::cout << asmFilename << "\n\n";
+
+  codegen.generate(parsed_tree, asmFilename);
+  std::cout << "Assembly code generated: " << asmFilename << std::endl;
+
+  string exeFilename = "dist/program";
+  if (assembleAndLink(asmFilename, exeFilename))
+  {
+    std::cout << "\n=== COMPILATION SUCCESS ===" << std::endl;
+  }
+  else
+  {
+    std::cout << "\n=== COMPILATION FAILED ===\n";
+    std::cout << "Make sure you have 'nasm' and 'ld' installed:\n";
+    std::cout << "sudo apt-get install nasm / sudo apt-get install binutils" << std::endl;
+  }
+
+  delete parsed_tree;
+
+  return EXIT_SUCCESS;
 }

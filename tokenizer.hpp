@@ -1,113 +1,223 @@
 #pragma once
+
 #include <iostream>
 #include <string>
 #include <vector>
 
 using std::string;
 
-/*
- *
- *      Lexing/tokenizing, converting sets of characters iterated line by line
- * or character by character into series of tokens
- *
- */
+// ============================================
+// LEXER (TOKENIZER) : Breaks the source code into meaningful chunks
+// ============================================
 
-enum class TokenType {
-  _return,
-  let,
-  equal,
-  varriable_name,
-  variable_value,
-  double_quotes,
-  int_lit,
-  semi
+enum class TokenType
+{
+  STRING,
+  INT,
+  IDENTIFIER,
+  NUMBER,
+  STRING_LITERAL,
+  ASSIGN,
+  PLUS,
+  MINUS,
+  MULTIPLY,
+  DIVIDE,
+  SEMICOLON,
+  L_PAREN,
+  R_PAREN,
+  L_BRACE,
+  R_BRACE,
+  IF,
+  PRINTLN,
+  EXIT,
+  GREATER,
+  LESS,
+  EQUAL,
+  END_OF_FILE
 };
 
-struct Token {
+struct Token
+{
   TokenType type;
   string value;
+  int line;
 };
 
-std::vector<Token> tokenize(const string &str, const int line_number) {
-  std::vector<Token> tokens{};
-  string str_buf{};
-  bool isStringStarted{false};
+class Lexer
+{
+private:
+  string source{};
+  size_t pos{};
+  int line{};
 
-  for (size_t i = 0; i < str.length(); i++) {
-    char c = str.at(i);
+  char peek()
+  {
+    if (pos >= source.length())
+      return '\0';
+    return source[pos];
+  }
 
-    if (std::isalpha(static_cast<unsigned char>(c)) || c == '=' || c == '"' ||
-        std::isdigit(c)) {
-      str_buf.push_back(c);
-    } else if (std::isspace(static_cast<unsigned char>(c))) {
-      if (!str_buf.empty()) {
-        if (str_buf == "let") {
-          tokens.push_back({.type = TokenType::let, .value = "let"});
-        } else if (str_buf == "return") {
-          tokens.push_back({.type = TokenType::_return, .value = "return"});
-        } else if (str_buf == "=") {
-          tokens.push_back({.type = TokenType::equal, .value = "equal"});
-        } else {
-          // std::cout << str_buf << "\n";
-          if (!tokens.empty() && tokens.back().type == TokenType::let) {
-            tokens.push_back(
-                {.type = TokenType::varriable_name, .value = str_buf});
-          } else if (!tokens.empty() &&
-                     tokens.back().type == TokenType::equal) {
-            tokens.push_back({.type = TokenType::variable_value,
-                              .value = str_buf.substr(0, i - 1)});
-          } else {
-            std::cerr << "Incorrect syntax, on line " << line_number << ":" << i
-                      << std::endl;
-            std::exit(EXIT_FAILURE);
-          }
-        }
+  char advance()
+  {
+    return source[pos++];
+  }
 
-        str_buf.clear();
-      }
-    } else if (c == ';') {
-      if (str_buf.at(0) == '"' && str_buf.at(str_buf.length() - 1) == '"') {
-        for (int j = 1; j < str_buf.length() - 1; j++) {
-          char k = str_buf.at(j);
-
-          if (k == '"') {
-            std::cerr << "Incorrect syntax, \"additional \" inside the "
-                         "string\", on line "
-                      << line_number << ":" << i << std::endl;
-            std::exit(EXIT_FAILURE);
-          }
-        }
-
-        tokens.push_back({.type = TokenType::variable_value,
-                          .value = str_buf.substr(1, str_buf.length() - 2)});
-      } else {
-        for (int j = 0; j < str_buf.length(); j++) {
-          char k = str_buf.at(j);
-
-          if (!std::isdigit(k)) {
-            std::cerr
-                << "Incorrect syntax, strings need \" at the beginning and "
-                   "ending, otherwise place a number in the variable. on line "
-                << line_number << ":" << i << std::endl;
-            std::exit(EXIT_FAILURE);
-          }
-        }
-
-        tokens.push_back({.type = TokenType::variable_value, .value = str_buf});
-      }
-
-      tokens.push_back({.type = TokenType::semi, .value = "semi"});
-      str_buf.clear();
+  void skip_white_space()
+  {
+    while (std::isspace(peek()))
+    {
+      if (peek() == '\n')
+        ++line;
+      advance();
     }
   }
 
-  return tokens;
-}
+  Token make_token(TokenType type, string value)
+  {
+    return {type, value, line};
+  }
 
-// std::vector<Token> tokenize(const string &str, const int line_number)
-// {
-//     std::vector<Token> tokens{};
-//     string str_buf{};
+  Token read_number()
+  {
+    string num{};
+    while (std::isdigit(peek()))
+    {
+      num += advance();
+    }
 
-//     return tokens;
-// }
+    return make_token(TokenType::NUMBER, num);
+  }
+
+  Token read_string()
+  {
+    advance(); // skip opening quote
+
+    string str;
+
+    while (peek() != '"' && peek() != '\0')
+    {
+      str += advance();
+    }
+
+    advance(); // skip closing quote
+
+    return make_token(TokenType::STRING_LITERAL, str);
+  }
+
+  Token read_identifier()
+  {
+    string id{};
+
+    while (std::isalnum(peek()) || peek() == '_')
+    {
+      id += advance();
+    }
+
+    if (id == "int")
+      return make_token(TokenType::INT, id);
+    if (id == "string")
+      return make_token(TokenType::STRING, id);
+    if (id == "if")
+      return make_token(TokenType::IF, id);
+    if (id == "println")
+      return make_token(TokenType::PRINTLN, id);
+    if (id == "exit")
+      return make_token(TokenType::EXIT, id);
+
+    return make_token(TokenType::IDENTIFIER, id);
+  }
+
+public:
+  Lexer(string src) : source(src) {}
+
+  std::vector<Token> tokenize()
+  {
+    std::vector<Token> tokens{};
+
+    while (peek() != '\0')
+    {
+      skip_white_space();
+
+      char c = peek();
+
+      if (isdigit(c))
+      {
+        tokens.push_back(read_number());
+      }
+      else if (c == '"')
+      {
+        tokens.push_back(read_string());
+      }
+      else if (isalpha(c) || c == '_')
+      {
+        tokens.push_back(read_identifier());
+      }
+      else if (c == '=')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::ASSIGN, "="));
+      }
+      else if (c == '+')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::PLUS, "+"));
+      }
+      else if (c == '-')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::MINUS, "-"));
+      }
+      else if (c == '*')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::MULTIPLY, "*"));
+      }
+      else if (c == '/')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::DIVIDE, "/"));
+      }
+      else if (c == ';')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::SEMICOLON, ";"));
+      }
+      else if (c == '(')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::L_PAREN, "("));
+      }
+      else if (c == ')')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::R_PAREN, ")"));
+      }
+      else if (c == '{')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::L_BRACE, "{"));
+      }
+      else if (c == '}')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::R_BRACE, "}"));
+      }
+      else if (c == '>')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::GREATER, ">"));
+      }
+      else if (c == '<')
+      {
+        advance();
+        tokens.push_back(make_token(TokenType::LESS, "<"));
+      }
+      else
+      {
+        advance();
+      }
+    }
+
+    return tokens;
+  }
+};
